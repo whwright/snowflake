@@ -134,17 +134,17 @@ func NewNode(node int64) (*Node, error) {
 // Generate creates and returns a unique snowflake ID
 // use GenerateID to generate snowflakes with error checking
 func (n *Node) Generate() ID {
-	id, _ := n.doGenerateID()
+	id, _ := n.doGenerateID(true)
 	return id
 }
 
 // GenerateID attempts to create and return a unique snowflake ID
 // If backwards clock drift is observed, a BackwardsTimeError will be returned
 func (n *Node) GenerateID() (ID, error) {
-	return n.doGenerateID()
+	return n.doGenerateID(false)
 }
 
-func (n *Node) doGenerateID() (r ID, err error) {
+func (n *Node) doGenerateID(isLegacy bool) (r ID, err error) {
 	n.mu.Lock()
 
 	now := time.Now().UnixNano() / 1000000
@@ -170,7 +170,10 @@ func (n *Node) doGenerateID() (r ID, err error) {
 		err = NewBackwardsTimeError(n.last - now)
 	}
 
-	n.last = now
+	// don't update the last generated time if there is an error for a non-legacy generation
+	if err != nil && !isLegacy {
+		n.last = now
+	}
 
 	n.mu.Unlock()
 	return r, err
